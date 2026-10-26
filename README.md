@@ -87,11 +87,12 @@ Para chamar o handler contra um Postgres local (por exemplo, o `docker compose` 
 | Branch | Ambiente | O que roda |
 |---|---|---|
 | `feature/*`, `feat/*` | — | Lint, testes, build, `terraform validate` |
-| PR → `develop` / `main` | homolog / prod | Tudo acima + `terraform plan` |
-| push `develop` | **homolog** | `terraform apply` + smoke test |
-| push `main` | **prod** | `terraform apply` + smoke test |
+| PR → `homolog` / `main` | homolog / prod | Tudo acima + `terraform plan` |
+| merge em `homolog` | **homolog** | `terraform apply` + smoke test |
+| merge em `main` | **prod** | `terraform apply` + smoke test |
 
-A `main` é protegida: não aceita push direto e exige PR com o CI verde.
+Fluxo: `feat/*` → PR para `homolog` (deploy em homolog) → PR de `homolog` para `main` (deploy em prod).
+As branches `main` e `homolog` são protegidas: não aceitam push direto e exigem PR aprovado com o CI verde.
 
 ### Configuração no GitHub
 

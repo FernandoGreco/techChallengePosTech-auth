@@ -2,9 +2,9 @@ name: CI/CD - Lambda de Autenticacao + API Gateway
 
 on:
   push:
-    branches: [main, develop, "feature/*", "feat/*"]
+    branches: [main, homolog, "feature/*", "feat/*"]
   pull_request:
-    branches: [main, develop]
+    branches: [main, homolog]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.base.ref || github.ref_name }}
@@ -64,7 +64,7 @@ jobs:
           terraform -chdir=terraform validate
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 2. PLAN - em PR para develop (homolog) ou main (prod)
+  # 2. PLAN - em PR para homolog ou main (prod)
   # ─────────────────────────────────────────────────────────────────────────────
   plan:
     name: "📋 Terraform plan (${{ github.base_ref == 'main' && 'prod' || 'homolog' }})"
@@ -109,11 +109,11 @@ jobs:
         run: terraform -chdir=terraform plan -input=false -var-file="environments/${ENVIRONMENT}.tfvars"
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 3. DEPLOY - push em develop → homolog | push em main → prod
+  # 3. DEPLOY - push em homolog → homolog | push em main → prod
   # ─────────────────────────────────────────────────────────────────────────────
   deploy:
     name: "🚀 Deploy (${{ github.ref_name == 'main' && 'prod' || 'homolog' }})"
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop')
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'homolog')
     needs: ci
     runs-on: ubuntu-latest
     environment:
