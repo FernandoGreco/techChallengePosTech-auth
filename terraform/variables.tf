@@ -90,3 +90,15 @@ variable "log_retention_days" {
   type    = number
   default = 7
 }
+
+variable "alarm_email" {
+  description = "E-mail que recebe os alarmes do CloudWatch via SNS (vazio = alarmes sem notificacao)"
+  type        = string
+  default     = ""
+}
+
+variable "latency_alarm_ms" {
+  description = "Limite de latencia p95 do API Gateway para disparar alarme"
+  type        = number
+  default     = 1500
+}

@@ -8,6 +8,17 @@ Contém:
 - **API Gateway (HTTP API):** ponto único de entrada. Faz o roteamento para a Lambda e para a aplicação no Kubernetes.
 - **Terraform e GitHub Actions:** provisionamento e deploy automático em homologação e produção.
 
+## Links
+
+| | |
+|---|---|
+| 🚀 Deploy ativo (homolog) | `POST https://rwnsx3w834.execute-api.us-east-1.amazonaws.com/auth/cpf` |
+| 📘 Swagger (OpenAPI) | [`docs/openapi.yaml`](docs/openapi.yaml). Para visualizar, abra no [Swagger Editor](https://editor.swagger.io) (*File → Import URL*, com a URL *raw* do arquivo) |
+| 📮 Postman | [`docs/postman/oficina-auth.postman_collection.json`](docs/postman/oficina-auth.postman_collection.json) |
+| 📄 Contrato | [`docs/auth-contract.md`](docs/auth-contract.md) |
+| 🧭 RFC / ADR | [RFC-001: estratégia de autenticação](docs/rfc-001-estrategia-autenticacao.md) · [ADR-001: Lambda Authorizer HS256](docs/adr-001-lambda-authorizer-hs256.md) |
+| 📊 Dashboard | Output `dashboard_url` do Terraform, que também aparece no resumo do deploy no Actions |
+
 | Repositório | Responsável |
 |---|---|
 | [techChallengePosTech-auth](https://github.com/FernandoGreco/techChallengePosTech-auth) (este) | Junior |
@@ -137,6 +148,33 @@ curl -i "$API/ordens-servico" -H "Authorization: Bearer $TOKEN"
 ```
 
 O Swagger da aplicação fica disponível pelo gateway em `GET $API/api/docs`.
+
+## Observabilidade
+
+Tudo criado pelo Terraform (`terraform/monitoring.tf`):
+
+- **Dashboard CloudWatch `oficina-auth-<env>`:**
+  - requisições, latência p50/p95, latência de integração e erros 4xx/5xx do gateway;
+  - invocações, erros e duração das duas Lambdas;
+  - autenticações por resultado, com uma query sobre os logs;
+  - últimas requisições do access log.
+- **Alarmes:**
+  - 5xx no gateway (5 ou mais por minuto);
+  - latência p95 acima de `latency_alarm_ms` (padrão 1500 ms);
+  - erros em cada Lambda.
+
+  Se `alarm_email` estiver preenchido, os alarmes notificam por SNS. É preciso confirmar a assinatura no e-mail.
+- **Logs estruturados (JSON):** os campos são `timestamp`, `level`, `service`, `message` e `correlationId`. O CPF aparece sempre mascarado.
+- **Correlação:** o `x-correlation-id` enviado pelo cliente, ou o `requestId` do gateway, volta na resposta e é repassado à aplicação.
+
+Exemplo no CloudWatch Logs Insights:
+
+```
+fields @timestamp, level, message, correlationId, clienteId, duracaoMs
+| filter correlationId = "<id>"
+```
+
+As mesmas métricas podem ser levadas para o Datadog ou o New Relic do grupo pela integração AWS (CloudWatch).
 
 ## Decisões de design
 

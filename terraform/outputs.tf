@@ -20,3 +20,8 @@ output "auth_function_name" {
 output "authorizer_function_name" {
   value = aws_lambda_function.authorizer.function_name
 }
+
+output "dashboard_url" {
+  description = "Dashboard de monitoramento no CloudWatch"
+  value       = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards/dashboard/${aws_cloudwatch_dashboard.auth.dashboard_name}"
+}
