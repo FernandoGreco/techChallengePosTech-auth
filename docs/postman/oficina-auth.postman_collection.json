@@ -1,0 +1,96 @@
+{
+  "info": {
+    "name": "Oficina - Autenticação via CPF",
+    "description": "Fluxo de autenticação pelo API Gateway. Ajuste a variável baseUrl e rode a coleção em ordem (Runner). O token do passo 1 é salvo automaticamente em {{token}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://rwnsx3w834.execute-api.us-east-1.amazonaws.com" },
+    { "key": "cpfAtivo", "value": "123.456.789-09" },
+    { "key": "cpfInativo", "value": "529.982.247-25" },
+    { "key": "cpfNaoCadastrado", "value": "111.444.777-35" },
+    { "key": "rotaProtegida", "value": "ordens-servico" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticar - cliente ativo (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 com accessToken', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.tokenType).to.eql('Bearer');",
+              "  pm.collectionVariables.set('token', body.accessToken);",
+              "});",
+              "pm.test('retorna x-correlation-id', () => pm.response.to.have.header('x-correlation-id'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"cpf\": \"{{cpfAtivo}}\" }" },
+        "url": "{{baseUrl}}/auth/cpf"
+      }
+    },
+    {
+      "name": "2. Autenticar - CPF inválido (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('400 CPF_INVALIDO', () => {", "  pm.response.to.have.status(400);", "  pm.expect(pm.response.json().erro).to.eql('CPF_INVALIDO');", "});"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"cpf\": \"111\" }" },
+        "url": "{{baseUrl}}/auth/cpf"
+      }
+    },
+    {
+      "name": "3. Autenticar - CPF não cadastrado (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 CLIENTE_NAO_ENCONTRADO', () => {", "  pm.response.to.have.status(401);", "  pm.expect(pm.response.json().erro).to.eql('CLIENTE_NAO_ENCONTRADO');", "});"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"cpf\": \"{{cpfNaoCadastrado}}\" }" },
+        "url": "{{baseUrl}}/auth/cpf"
+      }
+    },
+    {
+      "name": "4. Autenticar - cliente inativo (403)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('403 CLIENTE_INATIVO', () => {", "  pm.response.to.have.status(403);", "  pm.expect(pm.response.json().erro).to.eql('CLIENTE_INATIVO');", "});"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"cpf\": \"{{cpfInativo}}\" }" },
+        "url": "{{baseUrl}}/auth/cpf"
+      }
+    },
+    {
+      "name": "5. Rota protegida - sem token (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 sem token', () => pm.response.to.have.status(401));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/{{rotaProtegida}}" }
+    },
+    {
+      "name": "6. Rota protegida - token adulterado (403)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('403 token invalido', () => pm.response.to.have.status(403));"] } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}x" }],
+        "url": "{{baseUrl}}/{{rotaProtegida}}"
+      }
+    },
+    {
+      "name": "7. Rota protegida - com token (2xx)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('autorizado pelo gateway', () => pm.expect(pm.response.code).to.not.be.oneOf([401, 403]));"] } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/{{rotaProtegida}}"
+      }
+    }
+  ]
+}
