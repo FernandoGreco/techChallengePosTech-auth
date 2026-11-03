@@ -65,10 +65,11 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 2. PLAN - em PR para homolog ou main (prod)
+  # PRs vindos de fork nao recebem secrets, entao o plan so roda para branches do proprio repo
   # ─────────────────────────────────────────────────────────────────────────────
   plan:
     name: "📋 Terraform plan (${{ github.base_ref == 'main' && 'prod' || 'homolog' }})"
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     needs: ci
     runs-on: ubuntu-latest
     environment: ${{ github.base_ref == 'main' && 'prod' || 'homolog' }}
