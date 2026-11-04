@@ -1,0 +1,121 @@
+openapi: 3.0.3
+info:
+  title: Oficina - Autenticação via CPF (API Gateway)
+  version: 1.0.0
+  description: |
+    Ponto único de entrada da oficina (AWS API Gateway HTTP API).
+
+    - `POST /auth/cpf` é público. Uma Lambda valida o CPF, consulta o cliente no RDS e emite um JWT (HS256).
+    - As demais rotas (`ANY /{proxy+}`) são protegidas por um Lambda Authorizer e repassadas para a aplicação no Kubernetes. A aplicação recebe os headers `x-cliente-id`, `x-usuario-papel` e `x-correlation-id`, sempre sobrescritos pelo gateway.
+
+    O contrato completo está em [auth-contract.md](auth-contract.md).
+servers:
+  - url: https://rwnsx3w834.execute-api.us-east-1.amazonaws.com
+    description: Homologação
+tags:
+  - name: Autenticação
+  - name: Rotas protegidas
+paths:
+  /auth/cpf:
+    post:
+      tags: [Autenticação]
+      summary: Autentica o cliente pelo CPF e devolve um JWT
+      operationId: autenticarPorCpf
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cpf]
+              properties:
+                cpf:
+                  type: string
+                  description: CPF com ou sem pontuação
+                  example: 123.456.789-09
+      responses:
+        '200':
+          description: Cliente ativo, token emitido
+          headers:
+            x-correlation-id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '400':
+          description: Corpo inválido ou CPF com dígito verificador inválido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+              example: { erro: CPF_INVALIDO, mensagem: Informe um CPF valido }
+        '401':
+          description: CPF não cadastrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+              example: { erro: CLIENTE_NAO_ENCONTRADO, mensagem: Cliente nao cadastrado }
+        '403':
+          description: Cliente inativo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+              example: { erro: CLIENTE_INATIVO, mensagem: Cliente inativo }
+        '500':
+          description: Falha ao consultar o banco
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Erro' }
+              example: { erro: ERRO_INTERNO, mensagem: Erro ao autenticar }
+  /{proxy}:
+    parameters:
+      - name: proxy
+        in: path
+        required: true
+        description: Qualquer rota da aplicação (ex. `ordens-servico`). O Swagger da aplicação fica em `/api/docs`.
+        schema: { type: string }
+    get:
+      tags: [Rotas protegidas]
+      summary: Rota protegida da aplicação (o mesmo vale para POST, PUT, PATCH e DELETE)
+      security:
+        - bearerAuth: []
+      responses:
+        '2XX':
+          description: Requisição autorizada e repassada para a aplicação
+        '401':
+          description: Header Authorization ausente (resposta do API Gateway)
+        '403':
+          description: Token inválido, adulterado ou expirado (resposta do Lambda Authorizer)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CorrelationId:
+      name: x-correlation-id
+      in: header
+      required: false
+      description: Id para rastrear a requisição. Se não for enviado, o gateway usa o requestId.
+      schema: { type: string }
+  headers:
+    CorrelationId:
+      description: Mesmo id usado nos logs estruturados
+      schema: { type: string }
+  schemas:
+    Token:
+      type: object
+      properties:
+        accessToken: { type: string, description: 'JWT HS256 com claims sub, cpf, nome, papel, iss, iat e exp' }
+        tokenType: { type: string, example: Bearer }
+        expiresIn: { type: integer, example: 3600 }
+    Erro:
+      type: object
+      properties:
+        erro:
+          type: string
+          enum: [CPF_INVALIDO, CLIENTE_NAO_ENCONTRADO, CLIENTE_INATIVO, ERRO_INTERNO]
+        mensagem: { type: string }
